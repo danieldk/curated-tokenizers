@@ -148,10 +148,15 @@ cdef class ByteBPEProcessor:
         """
         pieces = []
         for token in regex.findall(self._split_pattern, text):
+            pieces.extend(self._encode_token(token))
+        return pieces
+
+    @lru_cache(maxsize=8192)
+    def _encode_token(self, token: List[str]) -> List[str]:
             token_bytes = [self._byte_encoder[b] for b in token.encode("utf-8")]
             merged = deref(self._merges).apply_merges(token_bytes)
-            pieces.extend(merge.decode("utf-8") for merge in merged)
-        return pieces
+            return [merge.decode("utf-8") for merge in merged]
+
 
     @property
     def merges(self) -> List[Tuple[str, str]]:

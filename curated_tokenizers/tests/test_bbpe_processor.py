@@ -6,10 +6,18 @@ import pytest
 
 from curated_tokenizers import ByteBPEProcessor
 
+from .compat import has_huggingface_hub, huggingface_hub
+
 
 @pytest.fixture(scope="module")
 def test_dir(request):
     return Path(request.fspath).parent
+
+
+@pytest.fixture
+def text_troonrede(test_dir):
+    with open(test_dir / "troonrede.txt", encoding="utf-8") as f:
+        return [line.strip() for line in f if line.strip()]
 
 
 @pytest.fixture
@@ -24,6 +32,20 @@ def merges_path(test_dir):
 
 @pytest.fixture
 def toy_processor(vocab_path, merges_path):
+    return ByteBPEProcessor.load_from_files(
+        vocab=vocab_path,
+        merges=merges_path,
+    )
+
+
+@pytest.fixture
+def robbert_processor():
+    vocab_path = huggingface_hub.hf_hub_download(
+        "pdelobelle/robbert-v2-dutch-base", "vocab.json"
+    )
+    merges_path = huggingface_hub.hf_hub_download(
+        "pdelobelle/robbert-v2-dutch-base", "merges.txt"
+    )
     return ByteBPEProcessor.load_from_files(
         vocab=vocab_path,
         merges=merges_path,
@@ -123,3 +145,14 @@ def test_pickle(toy_processor):
     assert isinstance(deserialized, ByteBPEProcessor)
     assert deserialized.vocab == toy_processor.vocab
     assert deserialized.merges == toy_processor.merges
+
+
+def encode_sample_text(processor, paragraphs):
+    for p in paragraphs:
+        processor.encode(p)
+
+
+@pytest.mark.bench
+@pytest.mark.skipif(not has_huggingface_hub, reason="requires huggingface_hub")
+def test_speed(benchmark, robbert_processor, text_troonrede):
+    benchmark(encode_sample_text, robbert_processor, text_troonrede)
